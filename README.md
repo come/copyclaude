@@ -48,5 +48,8 @@ vide, il remplace les défauts.
   que vous copiez reste exactement ce que Ctrl+V collera ailleurs.
 - **Pas de vol de focus** : la fenêtre est `Topmost` avec `WS_EX_NOACTIVATE` ;
   les ajouts automatiques ne désactivent jamais le terminal.
+- **Topmost seulement devant le terminal** : quand une autre app passe au
+  premier plan, la fenêtre perd `Topmost` et se laisse recouvrir ; elle
+  redevient au-dessus dès le retour sur le terminal (ou un clic sur elle).
 - **Event-based** : écoute via `AddClipboardFormatListener`, aucun polling.
 - **Debounce 300 ms** : un drag de sélection ne produit qu'un seul bloc.
