@@ -49,6 +49,25 @@ internal static class Native
     [DllImport("user32.dll")]
     public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
 
+    // --- Identité des terminaux (un buffer de captures par fenêtre de terminal) ---
+
+    /// <summary>Vrai si le handle désigne une fenêtre encore existante (détection de fermeture).</summary>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsWindow(IntPtr hwnd);
+
+    /// <summary>Titre brut d'une fenêtre (W = Unicode).</summary>
+    [DllImport("user32.dll", EntryPoint = "GetWindowTextW", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowTextW(IntPtr hwnd, char[] buffer, int maxCount);
+
+    /// <summary>Titre courant d'une fenêtre (étiquette d'onglet) ; chaîne vide si aucun.</summary>
+    public static string GetWindowTitle(IntPtr hwnd)
+    {
+        var buffer = new char[256];
+        var length = GetWindowTextW(hwnd, buffer, buffer.Length);
+        return length > 0 ? new string(buffer, 0, length) : "";
+    }
+
     // --- Suivi des changements de fenêtre au premier plan (event-based) ---
 
     /// <summary>Signature du callback de SetWinEventHook.</summary>
