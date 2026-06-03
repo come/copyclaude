@@ -32,6 +32,13 @@ In Windows Terminal's `settings.json` (Settings → *Open JSON file*), add:
 - Select text in Windows Terminal → it appears at the bottom of the floating
   window as a small, dimmed block prefixed with `> `, followed by an empty
   paragraph where the caret is placed.
+- **One buffer per terminal window**: captures are attached to the terminal
+  they came from. The floating window automatically shows the buffer of the
+  terminal currently in focus; a tab bar (shown when there are 2+ buffers)
+  lets you switch manually. Closing a terminal removes its buffer. Note:
+  granularity is the terminal *window* — Windows Terminal tabs share a single
+  window and cannot be told apart (the live tab label reflects the window
+  title). Notes typed before any capture live in a permanent "Notes" tab.
 - Click inside the window to type freely in normal-size text (notes under a
   captured block, etc.). New captures are always appended **at the end** —
   nothing you typed is ever overwritten.
