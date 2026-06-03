@@ -4,6 +4,8 @@ A small Windows background app: every text selection in the terminal is appended
 to an editable floating window, **without stealing focus** and **without
 touching the clipboard** (the selection stays pasteable with Ctrl+V).
 
+![CopyClaude demo](docs/copyclaude.gif)
+
 ## Install
 
 Download the latest installer (`CopyClaude-Setup-*.exe`) from the
