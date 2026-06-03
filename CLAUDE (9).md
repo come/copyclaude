@@ -25,7 +25,8 @@ presse-papier. Spec détaillée dans `brief-fenetre-flottante.md`.
 - Tous les `DllImport` regroupés dans une classe statique `Native` ; chaque
   constante Win32 commentée avec sa valeur et son rôle.
 - `Main` annoté `[STAThread]` (requis WPF).
-- Commentaires et libellés UI en **français** ; messages de commit en **anglais**.
+- Commentaires et libellés UI en **français** ; messages de commit et
+  **identifiants de code** (fonctions, classes, variables) en **anglais**.
 - Commits petits et atomiques.
 
 ## Pièges Win32 à ne jamais oublier

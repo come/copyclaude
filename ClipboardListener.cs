@@ -17,10 +17,10 @@ internal sealed class ClipboardListener : IDisposable
     private readonly DispatcherTimer _debounce;
 
     /// <summary>Vrai si au moins un event pendant la fenêtre de debounce venait du terminal.</summary>
-    private bool _eventVenantDuTerminal;
+    private bool _cameFromTerminal;
 
     /// <summary>Déclenché (sur le thread UI) avec le texte final d'une sélection terminal stabilisée.</summary>
-    public event Action<string>? CaptureStabilisee;
+    public event Action<string>? CaptureStabilized;
 
     public ClipboardListener()
     {
@@ -37,7 +37,7 @@ internal sealed class ClipboardListener : IDisposable
         // Debounce ~300 ms : copyOnSelect émet un event à chaque tick de drag ;
         // on n'ajoute le bloc qu'une fois la sélection stable.
         _debounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
-        _debounce.Tick += OnDebounceEcoule;
+        _debounce.Tick += OnDebounceElapsed;
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
@@ -46,8 +46,8 @@ internal sealed class ClipboardListener : IDisposable
         {
             // Filtre vérifié AU MOMENT de l'event : on ne retient que les copies
             // faites pendant que le terminal est au premier plan.
-            if (FiltreProcess.EstProcessTerminal(Native.GetForegroundWindow()))
-                _eventVenantDuTerminal = true;
+            if (ProcessFilter.IsTerminalProcess(Native.GetForegroundWindow()))
+                _cameFromTerminal = true;
 
             // Chaque event relance la fenêtre de debounce (drag en cours → on attend).
             _debounce.Stop();
@@ -57,25 +57,25 @@ internal sealed class ClipboardListener : IDisposable
         return IntPtr.Zero;
     }
 
-    private void OnDebounceEcoule(object? sender, EventArgs e)
+    private void OnDebounceElapsed(object? sender, EventArgs e)
     {
         _debounce.Stop();
-        if (!_eventVenantDuTerminal)
+        if (!_cameFromTerminal)
             return;
-        _eventVenantDuTerminal = false;
+        _cameFromTerminal = false;
 
-        var texte = LireTexteClipboard();
-        if (!string.IsNullOrEmpty(texte))
-            CaptureStabilisee?.Invoke(texte);
+        var text = ReadClipboardText();
+        if (!string.IsNullOrEmpty(text))
+            CaptureStabilized?.Invoke(text);
     }
 
     /// <summary>
     /// Lecture robuste : le presse-papier peut être verrouillé une fraction de
     /// seconde par l'émetteur → on retente ~5 fois avec ~30 ms de délai.
     /// </summary>
-    private static string? LireTexteClipboard()
+    private static string? ReadClipboardText()
     {
-        for (var essai = 0; essai < 5; essai++)
+        for (var attempt = 0; attempt < 5; attempt++)
         {
             try
             {

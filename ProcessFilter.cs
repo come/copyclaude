@@ -8,18 +8,18 @@ namespace CopyClaude;
 /// du premier plan. Allowlist configurable via <c>allowlist.txt</c> à côté de
 /// l'exe (un nom de process par ligne, sans extension, <c>#</c> pour commenter).
 /// </summary>
-internal static class FiltreProcess
+internal static class ProcessFilter
 {
     /// <summary>Allowlist par défaut des process terminal (nom sans extension, insensible à la casse).</summary>
-    private static readonly string[] AllowlistParDefaut =
+    private static readonly string[] DefaultAllowlist =
         ["WindowsTerminal", "pwsh", "powershell", "conhost", "Code"];
 
-    private static readonly HashSet<string> Allowlist = ChargerAllowlist();
+    private static readonly HashSet<string> Allowlist = LoadAllowlist();
 
     /// <summary>Vrai si la fenêtre appartient à un process de l'allowlist.</summary>
-    public static bool EstProcessTerminal(IntPtr hwnd)
+    public static bool IsTerminalProcess(IntPtr hwnd)
     {
-        var pid = PidDeLaFenetre(hwnd);
+        var pid = GetWindowPid(hwnd);
         if (pid == 0)
             return false;
 
@@ -36,10 +36,10 @@ internal static class FiltreProcess
     }
 
     /// <summary>Vrai si la fenêtre appartient à notre propre process (la fenêtre flottante).</summary>
-    public static bool EstNotreProcess(IntPtr hwnd) =>
-        PidDeLaFenetre(hwnd) == (uint)Environment.ProcessId;
+    public static bool IsOwnProcess(IntPtr hwnd) =>
+        GetWindowPid(hwnd) == (uint)Environment.ProcessId;
 
-    private static uint PidDeLaFenetre(IntPtr hwnd)
+    private static uint GetWindowPid(IntPtr hwnd)
     {
         if (hwnd == IntPtr.Zero)
             return 0;
@@ -47,19 +47,19 @@ internal static class FiltreProcess
         return pid;
     }
 
-    private static HashSet<string> ChargerAllowlist()
+    private static HashSet<string> LoadAllowlist()
     {
-        var noms = AllowlistParDefaut.AsEnumerable();
-        var chemin = Path.Combine(AppContext.BaseDirectory, "allowlist.txt");
-        if (File.Exists(chemin))
+        var names = DefaultAllowlist.AsEnumerable();
+        var path = Path.Combine(AppContext.BaseDirectory, "allowlist.txt");
+        if (File.Exists(path))
         {
-            var lignes = File.ReadAllLines(chemin)
+            var lines = File.ReadAllLines(path)
                 .Select(l => l.Trim())
                 .Where(l => l.Length > 0 && !l.StartsWith('#'))
                 .ToArray();
-            if (lignes.Length > 0)
-                noms = lignes;
+            if (lines.Length > 0)
+                names = lines;
         }
-        return new HashSet<string>(noms, StringComparer.OrdinalIgnoreCase);
+        return new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
     }
 }

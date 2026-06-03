@@ -19,7 +19,7 @@ internal sealed class ForegroundWatcher : IDisposable
     /// Déclenché à chaque changement de premier plan, avec <c>true</c> si la
     /// nouvelle fenêtre est un terminal de l'allowlist ou notre propre fenêtre.
     /// </summary>
-    public event Action<bool>? PremierPlanPertinent;
+    public event Action<bool>? RelevantForegroundChanged;
 
     public ForegroundWatcher()
     {
@@ -40,8 +40,8 @@ internal sealed class ForegroundWatcher : IDisposable
     {
         // Notre propre fenêtre compte comme « pertinente » : cliquer dedans pour
         // taper une note ne doit pas la faire passer derrière.
-        var pertinent = FiltreProcess.EstProcessTerminal(hwnd) || FiltreProcess.EstNotreProcess(hwnd);
-        PremierPlanPertinent?.Invoke(pertinent);
+        var relevant = ProcessFilter.IsTerminalProcess(hwnd) || ProcessFilter.IsOwnProcess(hwnd);
+        RelevantForegroundChanged?.Invoke(relevant);
     }
 
     public void Dispose() => Native.UnhookWinEvent(_hook);

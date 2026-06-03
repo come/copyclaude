@@ -9,16 +9,16 @@ internal static class Program
     {
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
 
-        var fenetre = new FloatingWindow();
+        var window = new FloatingWindow();
         var listener = new ClipboardListener();
         var watcher = new ForegroundWatcher();
 
         // Sélection terminal stabilisée → bloc ajouté en fin de fenêtre flottante.
-        listener.CaptureStabilisee += fenetre.AjouterBloc;
+        listener.CaptureStabilized += window.AppendBlock;
 
         // La fenêtre ne reste au-dessus que devant le terminal (ou elle-même) ;
         // ailleurs elle perd Topmost et se laisse recouvrir.
-        watcher.PremierPlanPertinent += pertinent => fenetre.Topmost = pertinent;
+        watcher.RelevantForegroundChanged += relevant => window.Topmost = relevant;
 
         // Cleanup à la sortie : désabonnement du listener clipboard et du hook.
         app.Exit += (_, _) =>
@@ -27,6 +27,6 @@ internal static class Program
             watcher.Dispose();
         };
 
-        app.Run(fenetre);
+        app.Run(window);
     }
 }

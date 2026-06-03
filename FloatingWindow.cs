@@ -16,14 +16,14 @@ namespace CopyClaude;
 internal sealed class FloatingWindow : Window
 {
     /// <summary>Police réduite des blocs capturés.</summary>
-    private const double TailleCapture = 10.5;
+    private const double CaptureFontSize = 10.5;
 
     /// <summary>Police normale des notes tapées.</summary>
-    private const double TailleNote = 13;
+    private const double NoteFontSize = 13;
 
-    private static readonly Brush CouleurCapture = new SolidColorBrush(Color.FromRgb(0xA0, 0xA8, 0xB8));
+    private static readonly Brush CaptureBrush = new SolidColorBrush(Color.FromRgb(0xA0, 0xA8, 0xB8));
 
-    private readonly RichTextBox _zone;
+    private readonly RichTextBox _editor;
     private readonly ToggleButton _autoFocus;
 
     public FloatingWindow()
@@ -42,12 +42,12 @@ internal sealed class FloatingWindow : Window
         AllowsTransparency = true;
 
         // Position par défaut : coin bas-droit de la zone de travail.
-        var zone = SystemParameters.WorkArea;
-        Left = zone.Right - Width - 16;
-        Top = zone.Bottom - Height - 16;
+        var workArea = SystemParameters.WorkArea;
+        Left = workArea.Right - Width - 16;
+        Top = workArea.Bottom - Height - 16;
 
         // --- En-tête : zone de drag + boutons ---
-        var titre = new TextBlock
+        var title = new TextBlock
         {
             Text = "Captures terminal",
             Foreground = Brushes.White,
@@ -72,34 +72,34 @@ internal sealed class FloatingWindow : Window
         _autoFocus.Checked += (_, _) => _autoFocus.Foreground = Brushes.White;
         _autoFocus.Unchecked += (_, _) => _autoFocus.Foreground = new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0xAA));
 
-        var boutonEffacer = CreerBoutonEntete("Effacer", "Vider le contenu de la fenêtre");
-        boutonEffacer.Click += (_, _) => _zone!.Document.Blocks.Clear();
+        var clearButton = CreateHeaderButton("Effacer", "Vider le contenu de la fenêtre");
+        clearButton.Click += (_, _) => _editor!.Document.Blocks.Clear();
 
-        var boutonQuitter = CreerBoutonEntete("✕", "Quitter l'application");
-        boutonQuitter.Click += (_, _) => Close();
+        var quitButton = CreateHeaderButton("✕", "Quitter l'application");
+        quitButton.Click += (_, _) => Close();
 
-        var boutons = new StackPanel { Orientation = Orientation.Horizontal };
-        boutons.Children.Add(_autoFocus);
-        boutons.Children.Add(boutonEffacer);
-        boutons.Children.Add(boutonQuitter);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal };
+        buttons.Children.Add(_autoFocus);
+        buttons.Children.Add(clearButton);
+        buttons.Children.Add(quitButton);
 
-        var grilleEntete = new DockPanel { LastChildFill = true };
-        DockPanel.SetDock(boutons, Dock.Right);
-        grilleEntete.Children.Add(boutons);
-        grilleEntete.Children.Add(titre);
+        var headerPanel = new DockPanel { LastChildFill = true };
+        DockPanel.SetDock(buttons, Dock.Right);
+        headerPanel.Children.Add(buttons);
+        headerPanel.Children.Add(title);
 
-        var entete = new Border
+        var header = new Border
         {
             Background = new SolidColorBrush(Color.FromRgb(0x2D, 0x2D, 0x3A)),
             Height = 28,
-            Child = grilleEntete,
+            Child = headerPanel,
         };
         // Drag de la fenêtre par l'en-tête.
-        entete.MouseLeftButtonDown += (_, _) => DragMove();
+        header.MouseLeftButtonDown += (_, _) => DragMove();
 
         // --- Zone de texte unique : blocs capturés (police réduite) + notes libres
         // (police normale). RichTextBox car un TextBox ne sait pas mélanger les polices.
-        _zone = new RichTextBox
+        _editor = new RichTextBox
         {
             AcceptsReturn = true,
             AcceptsTab = true,
@@ -107,20 +107,20 @@ internal sealed class FloatingWindow : Window
             BorderThickness = new Thickness(0),
             Padding = new Thickness(6),
             FontFamily = new FontFamily("Cascadia Mono, Consolas"),
-            FontSize = TailleNote,
+            FontSize = NoteFontSize,
             Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x28)),
             Foreground = Brushes.Gainsboro,
             CaretBrush = Brushes.White,
         };
-        _zone.Document.Blocks.Clear(); // retire le paragraphe vide créé par défaut
+        _editor.Document.Blocks.Clear(); // retire le paragraphe vide créé par défaut
 
-        var grille = new Grid();
-        grille.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grille.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        Grid.SetRow(entete, 0);
-        Grid.SetRow(_zone, 1);
-        grille.Children.Add(entete);
-        grille.Children.Add(_zone);
+        var grid = new Grid();
+        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        Grid.SetRow(header, 0);
+        Grid.SetRow(_editor, 1);
+        grid.Children.Add(header);
+        grid.Children.Add(_editor);
 
         Content = new Border
         {
@@ -128,7 +128,7 @@ internal sealed class FloatingWindow : Window
             BorderBrush = new SolidColorBrush(Color.FromRgb(0x4A, 0x4A, 0x5A)),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(6),
-            Child = grille,
+            Child = grid,
         };
 
         // Piège n°1 : WS_EX_NOACTIVATE appliqué dès que le HWND existe, pour que
@@ -150,14 +150,14 @@ internal sealed class FloatingWindow : Window
         // Clic qui PREND le focus → caret en fin de buffer, prêt à taper sous la
         // dernière capture. Si la zone a déjà le focus, comportement classique
         // (le caret va là où on clique).
-        _zone.PreviewMouseLeftButtonDown += (_, e) =>
+        _editor.PreviewMouseLeftButtonDown += (_, e) =>
         {
-            if (_zone.IsKeyboardFocusWithin)
+            if (_editor.IsKeyboardFocusWithin)
                 return;
             Native.SetForegroundWindow(new WindowInteropHelper(this).Handle);
-            _zone.Focus();
-            _zone.CaretPosition = _zone.Document.ContentEnd;
-            _zone.ScrollToEnd();
+            _editor.Focus();
+            _editor.CaretPosition = _editor.Document.ContentEnd;
+            _editor.ScrollToEnd();
             e.Handled = true; // empêche ce premier clic de replacer le caret
         };
     }
@@ -168,39 +168,39 @@ internal sealed class FloatingWindow : Window
     /// de ce qui précède, puis un paragraphe vide en police normale où le caret
     /// se pose pour enchaîner une note. N'active pas la fenêtre.
     /// </summary>
-    public void AjouterBloc(string texte)
+    public void AppendBlock(string text)
     {
-        var bloc = new Paragraph
+        var block = new Paragraph
         {
-            FontSize = TailleCapture,
-            Foreground = CouleurCapture,
+            FontSize = CaptureFontSize,
+            Foreground = CaptureBrush,
             // Marge haute = l'espacement entre le contenu existant et la capture.
-            Margin = new Thickness(0, _zone.Document.Blocks.Count > 0 ? 12 : 0, 0, 4),
+            Margin = new Thickness(0, _editor.Document.Blocks.Count > 0 ? 12 : 0, 0, 4),
         };
-        var lignes = texte.Replace("\r\n", "\n").TrimEnd('\n').Split('\n');
-        for (var i = 0; i < lignes.Length; i++)
+        var lines = text.Replace("\r\n", "\n").TrimEnd('\n').Split('\n');
+        for (var i = 0; i < lines.Length; i++)
         {
             if (i > 0)
-                bloc.Inlines.Add(new LineBreak());
-            bloc.Inlines.Add(new Run("> " + lignes[i]));
+                block.Inlines.Add(new LineBreak());
+            block.Inlines.Add(new Run("> " + lines[i]));
         }
-        _zone.Document.Blocks.Add(bloc);
+        _editor.Document.Blocks.Add(block);
 
         // Paragraphe vide en police normale : ce que je tape ensuite est en grand.
         var note = new Paragraph
         {
-            FontSize = TailleNote,
+            FontSize = NoteFontSize,
             Foreground = Brushes.Gainsboro,
             Margin = new Thickness(0),
         };
-        _zone.Document.Blocks.Add(note);
+        _editor.Document.Blocks.Add(note);
 
-        _zone.CaretPosition = note.ContentStart;
-        _zone.ScrollToEnd();
+        _editor.CaretPosition = note.ContentStart;
+        _editor.ScrollToEnd();
 
         // Auto-focus actif → la fenêtre prend le focus, prête pour la note.
         if (_autoFocus.IsChecked == true)
-            PrendreLeFocus();
+            GrabFocus();
     }
 
     /// <summary>
@@ -208,30 +208,30 @@ internal sealed class FloatingWindow : Window
     /// SetForegroundWindow que pour le thread qui possède l'input, donc on
     /// s'attache temporairement au thread de la fenêtre au premier plan.
     /// </summary>
-    private void PrendreLeFocus()
+    private void GrabFocus()
     {
         var hwnd = new WindowInteropHelper(this).Handle;
-        var threadPremierPlan = Native.GetWindowThreadProcessId(Native.GetForegroundWindow(), out _);
-        var notreThread = Native.GetCurrentThreadId();
+        var foregroundThread = Native.GetWindowThreadProcessId(Native.GetForegroundWindow(), out _);
+        var ourThread = Native.GetCurrentThreadId();
 
-        var attache = threadPremierPlan != 0 && threadPremierPlan != notreThread
-            && Native.AttachThreadInput(threadPremierPlan, notreThread, true);
+        var attached = foregroundThread != 0 && foregroundThread != ourThread
+            && Native.AttachThreadInput(foregroundThread, ourThread, true);
         try
         {
             Native.SetForegroundWindow(hwnd);
         }
         finally
         {
-            if (attache)
-                Native.AttachThreadInput(threadPremierPlan, notreThread, false);
+            if (attached)
+                Native.AttachThreadInput(foregroundThread, ourThread, false);
         }
-        _zone.Focus();
+        _editor.Focus();
     }
 
-    private static Button CreerBoutonEntete(string contenu, string infobulle) => new()
+    private static Button CreateHeaderButton(string content, string tooltip) => new()
     {
-        Content = contenu,
-        ToolTip = infobulle,
+        Content = content,
+        ToolTip = tooltip,
         Background = Brushes.Transparent,
         Foreground = Brushes.White,
         BorderThickness = new Thickness(0),
