@@ -1,55 +1,59 @@
-# CopyClaude — Fenêtre flottante de capture de sélections terminal
+# CopyClaude — Floating window capturing terminal selections
 
-Petite app Windows en arrière-plan : chaque sélection de texte dans le terminal
-est ajoutée en bas d'une fenêtre flottante éditable, **sans voler le focus** et
-**sans toucher au presse-papier** (la sélection reste collable avec Ctrl+V).
+A small Windows background app: every text selection in the terminal is appended
+to an editable floating window, **without stealing focus** and **without
+touching the clipboard** (the selection stays pasteable with Ctrl+V).
 
-## Pré-requis
+## Install
 
-1. **Windows Terminal — `copyOnSelect`** : c'est le déclencheur de la capture.
-   Dans le `settings.json` de Windows Terminal (Paramètres → *Ouvrir le fichier
-   JSON*), ajouter :
+Download the latest installer (`CopyClaude-Setup-*.exe`) from the
+[Releases](../../releases) page and run it — per-user install, no admin rights
+required.
 
-   ```json
-   "copyOnSelect": true
-   ```
-
-2. **.NET 8 SDK** pour le build.
-
-## Lancer
+Or build from source with the .NET 8 SDK:
 
 ```powershell
 dotnet run
 ```
 
-## Utilisation
+## Prerequisites
 
-- Sélectionner du texte dans Windows Terminal → le texte apparaît en bas de la
-  fenêtre flottante, chaque ligne préfixée `> `, suivie d'une ligne vide où le
-  caret est posé.
-- Cliquer dans la fenêtre permet d'y taper librement (notes sous un bloc, etc.).
-  Les captures suivantes s'ajoutent toujours **en fin**, rien n'est écrasé.
-- La fenêtre se déplace par son en-tête, se redimensionne par le coin bas-droit.
-- `Effacer` vide le contenu ; `✕` quitte l'app.
+**Windows Terminal — `copyOnSelect`**: this is what triggers the capture.
+In Windows Terminal's `settings.json` (Settings → *Open JSON file*), add:
 
-## Filtre des applications capturées
+```json
+"copyOnSelect": true
+```
 
-Seules les copies faites pendant qu'un process de l'allowlist est au premier
-plan sont capturées. Défauts : `WindowsTerminal`, `pwsh`, `powershell`,
-`conhost`, `Code`.
+## Usage
 
-Pour personnaliser : créer un fichier `allowlist.txt` à côté de l'exe, un nom
-de process par ligne (sans `.exe`, `#` pour commenter). S'il est présent et non
-vide, il remplace les défauts.
+- Select text in Windows Terminal → it appears at the bottom of the floating
+  window as a small, dimmed block prefixed with `> `, followed by an empty
+  paragraph where the caret is placed.
+- Click inside the window to type freely in normal-size text (notes under a
+  captured block, etc.). New captures are always appended **at the end** —
+  nothing you typed is ever overwritten.
+- Drag the window by its header, resize it from the bottom-right corner.
+- `Effacer` clears the content; `✕` quits the app.
 
-## Garanties
+## Filtering captured applications
 
-- **Presse-papier en lecture seule** : l'app ne fait jamais de `SetText`. Ce
-  que vous copiez reste exactement ce que Ctrl+V collera ailleurs.
-- **Pas de vol de focus** : la fenêtre est `Topmost` avec `WS_EX_NOACTIVATE` ;
-  les ajouts automatiques ne désactivent jamais le terminal.
-- **Topmost seulement devant le terminal** : quand une autre app passe au
-  premier plan, la fenêtre perd `Topmost` et se laisse recouvrir ; elle
-  redevient au-dessus dès le retour sur le terminal (ou un clic sur elle).
-- **Event-based** : écoute via `AddClipboardFormatListener`, aucun polling.
-- **Debounce 300 ms** : un drag de sélection ne produit qu'un seul bloc.
+Only copies made while a process from the allowlist is in the foreground are
+captured. Defaults: `WindowsTerminal`, `pwsh`, `powershell`, `conhost`, `Code`.
+
+To customize: create an `allowlist.txt` file next to the exe, one process name
+per line (without `.exe`, `#` for comments). If present and non-empty, it
+replaces the defaults.
+
+## Guarantees
+
+- **Read-only clipboard**: the app never calls `SetText`. Whatever you copy is
+  exactly what Ctrl+V will paste elsewhere.
+- **No focus stealing**: the window uses `WS_EX_NOACTIVATE`; automatic appends
+  never deactivate the terminal.
+- **Topmost only in front of the terminal**: when another app comes to the
+  foreground, the window drops `Topmost` and lets itself be covered; it comes
+  back on top as soon as you return to the terminal (or click it).
+- **Event-based**: clipboard listening via `AddClipboardFormatListener`,
+  foreground tracking via `SetWinEventHook` — no polling anywhere.
+- **300 ms debounce**: a selection drag produces a single block.
