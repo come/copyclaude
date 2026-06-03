@@ -1,5 +1,3 @@
-using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -15,11 +13,6 @@ namespace CopyClaude;
 /// </summary>
 internal sealed class ClipboardListener : IDisposable
 {
-    /// <summary>Allowlist par défaut des process terminal (nom sans extension, insensible à la casse).</summary>
-    private static readonly string[] AllowlistParDefaut =
-        ["WindowsTerminal", "pwsh", "powershell", "conhost", "Code"];
-
-    private readonly HashSet<string> _allowlist;
     private readonly HwndSource _source;
     private readonly DispatcherTimer _debounce;
 
@@ -31,8 +24,6 @@ internal sealed class ClipboardListener : IDisposable
 
     public ClipboardListener()
     {
-        _allowlist = ChargerAllowlist();
-
         // Fenêtre message-only : invisible, ne sert qu'à recevoir WM_CLIPBOARDUPDATE.
         _source = new HwndSource(new HwndSourceParameters("CopyClaudeClipboardListener")
         {
@@ -55,7 +46,7 @@ internal sealed class ClipboardListener : IDisposable
         {
             // Filtre vérifié AU MOMENT de l'event : on ne retient que les copies
             // faites pendant que le terminal est au premier plan.
-            if (ForegroundEstDansAllowlist())
+            if (FiltreProcess.EstProcessTerminal(Native.GetForegroundWindow()))
                 _eventVenantDuTerminal = true;
 
             // Chaque event relance la fenêtre de debounce (drag en cours → on attend).
@@ -78,28 +69,6 @@ internal sealed class ClipboardListener : IDisposable
             CaptureStabilisee?.Invoke(texte);
     }
 
-    private bool ForegroundEstDansAllowlist()
-    {
-        var hwnd = Native.GetForegroundWindow();
-        if (hwnd == IntPtr.Zero)
-            return false;
-
-        Native.GetWindowThreadProcessId(hwnd, out var pid);
-        if (pid == 0)
-            return false;
-
-        try
-        {
-            using var process = Process.GetProcessById((int)pid);
-            return _allowlist.Contains(process.ProcessName);
-        }
-        catch (ArgumentException)
-        {
-            // Le process a disparu entre-temps.
-            return false;
-        }
-    }
-
     /// <summary>
     /// Lecture robuste : le presse-papier peut être verrouillé une fraction de
     /// seconde par l'émetteur → on retente ~5 fois avec ~30 ms de délai.
@@ -118,26 +87,6 @@ internal sealed class ClipboardListener : IDisposable
             }
         }
         return null;
-    }
-
-    /// <summary>
-    /// Allowlist configurable : un fichier <c>allowlist.txt</c> (un nom de process
-    /// par ligne) à côté de l'exe remplace les défauts s'il est présent.
-    /// </summary>
-    private static HashSet<string> ChargerAllowlist()
-    {
-        var noms = AllowlistParDefaut.AsEnumerable();
-        var chemin = Path.Combine(AppContext.BaseDirectory, "allowlist.txt");
-        if (File.Exists(chemin))
-        {
-            var lignes = File.ReadAllLines(chemin)
-                .Select(l => l.Trim())
-                .Where(l => l.Length > 0 && !l.StartsWith('#'))
-                .ToArray();
-            if (lignes.Length > 0)
-                noms = lignes;
-        }
-        return new HashSet<string>(noms, StringComparer.OrdinalIgnoreCase);
     }
 
     public void Dispose()
