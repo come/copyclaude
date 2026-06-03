@@ -127,6 +127,20 @@ internal sealed class FloatingWindow : Window
         // reste autorisé puisque c'est notre process qui vient de recevoir l'input.
         PreviewMouseDown += (_, _) =>
             Native.SetForegroundWindow(new WindowInteropHelper(this).Handle);
+
+        // Clic qui PREND le focus → caret en fin de buffer, prêt à taper sous la
+        // dernière capture. Si la zone a déjà le focus, comportement classique
+        // (le caret va là où on clique).
+        _zone.PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            if (_zone.IsKeyboardFocusWithin)
+                return;
+            Native.SetForegroundWindow(new WindowInteropHelper(this).Handle);
+            _zone.Focus();
+            _zone.CaretPosition = _zone.Document.ContentEnd;
+            _zone.ScrollToEnd();
+            e.Handled = true; // empêche ce premier clic de replacer le caret
+        };
     }
 
     /// <summary>
