@@ -19,8 +19,14 @@ internal sealed class ClipboardListener : IDisposable
     /// <summary>Vrai si au moins un event pendant la fenêtre de debounce venait du terminal.</summary>
     private bool _cameFromTerminal;
 
-    /// <summary>Déclenché (sur le thread UI) avec le texte final d'une sélection terminal stabilisée.</summary>
-    public event Action<string>? CaptureStabilized;
+    /// <summary>HWND du terminal au premier plan au moment de l'event (identifie le terminal source).</summary>
+    private IntPtr _sourceHwnd;
+
+    /// <summary>
+    /// Déclenché (sur le thread UI) avec le texte final d'une sélection terminal
+    /// stabilisée et le HWND de la fenêtre de terminal source.
+    /// </summary>
+    public event Action<string, IntPtr>? CaptureStabilized;
 
     public ClipboardListener()
     {
@@ -45,9 +51,14 @@ internal sealed class ClipboardListener : IDisposable
         if (msg == Native.WM_CLIPBOARDUPDATE)
         {
             // Filtre vérifié AU MOMENT de l'event : on ne retient que les copies
-            // faites pendant que le terminal est au premier plan.
-            if (ProcessFilter.IsTerminalProcess(Native.GetForegroundWindow()))
+            // faites pendant que le terminal est au premier plan. Le HWND est
+            // mémorisé ici aussi : c'est lui qui identifie le terminal source.
+            var foreground = Native.GetForegroundWindow();
+            if (ProcessFilter.IsTerminalProcess(foreground))
+            {
                 _cameFromTerminal = true;
+                _sourceHwnd = foreground;
+            }
 
             // Chaque event relance la fenêtre de debounce (drag en cours → on attend).
             _debounce.Stop();
@@ -63,10 +74,12 @@ internal sealed class ClipboardListener : IDisposable
         if (!_cameFromTerminal)
             return;
         _cameFromTerminal = false;
+        var sourceHwnd = _sourceHwnd;
+        _sourceHwnd = IntPtr.Zero;
 
         var text = ReadClipboardText();
         if (!string.IsNullOrEmpty(text))
-            CaptureStabilized?.Invoke(text);
+            CaptureStabilized?.Invoke(text, sourceHwnd);
     }
 
     /// <summary>
