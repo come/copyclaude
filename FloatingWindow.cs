@@ -1,6 +1,6 @@
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -14,7 +14,15 @@ namespace CopyClaude;
 /// </summary>
 internal sealed class FloatingWindow : Window
 {
-    private readonly TextBox _zone;
+    /// <summary>Police réduite des blocs capturés.</summary>
+    private const double TailleCapture = 10.5;
+
+    /// <summary>Police normale des notes tapées.</summary>
+    private const double TailleNote = 13;
+
+    private static readonly Brush CouleurCapture = new SolidColorBrush(Color.FromRgb(0xA0, 0xA8, 0xB8));
+
+    private readonly RichTextBox _zone;
 
     public FloatingWindow()
     {
@@ -47,7 +55,7 @@ internal sealed class FloatingWindow : Window
         };
 
         var boutonEffacer = CreerBoutonEntete("Effacer", "Vider le contenu de la fenêtre");
-        boutonEffacer.Click += (_, _) => _zone!.Clear();
+        boutonEffacer.Click += (_, _) => _zone!.Document.Blocks.Clear();
 
         var boutonQuitter = CreerBoutonEntete("✕", "Quitter l'application");
         boutonQuitter.Click += (_, _) => Close();
@@ -70,21 +78,22 @@ internal sealed class FloatingWindow : Window
         // Drag de la fenêtre par l'en-tête.
         entete.MouseLeftButtonDown += (_, _) => DragMove();
 
-        // --- Zone de texte unique : blocs capturés + notes libres ---
-        _zone = new TextBox
+        // --- Zone de texte unique : blocs capturés (police réduite) + notes libres
+        // (police normale). RichTextBox car un TextBox ne sait pas mélanger les polices.
+        _zone = new RichTextBox
         {
             AcceptsReturn = true,
             AcceptsTab = true,
-            TextWrapping = TextWrapping.Wrap,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             BorderThickness = new Thickness(0),
             Padding = new Thickness(6),
             FontFamily = new FontFamily("Cascadia Mono, Consolas"),
-            FontSize = 12,
+            FontSize = TailleNote,
             Background = new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x28)),
             Foreground = Brushes.Gainsboro,
             CaretBrush = Brushes.White,
         };
+        _zone.Document.Blocks.Clear(); // retire le paragraphe vide créé par défaut
 
         var grille = new Grid();
         grille.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -122,21 +131,38 @@ internal sealed class FloatingWindow : Window
 
     /// <summary>
     /// Ajoute un bloc capturé en FIN de buffer (n'écrase jamais le texte tapé) :
-    /// chaque ligne préfixée « &gt; », puis une ligne vide, caret en fin pour
-    /// enchaîner une note sans cliquer. N'active pas la fenêtre.
+    /// paragraphe en police réduite et grisée, lignes préfixées « &gt; », espacé
+    /// de ce qui précède, puis un paragraphe vide en police normale où le caret
+    /// se pose pour enchaîner une note. N'active pas la fenêtre.
     /// </summary>
     public void AjouterBloc(string texte)
     {
-        var sb = new StringBuilder(_zone.Text);
-        if (sb.Length > 0 && !_zone.Text.EndsWith('\n'))
-            sb.AppendLine();
+        var bloc = new Paragraph
+        {
+            FontSize = TailleCapture,
+            Foreground = CouleurCapture,
+            // Marge haute = l'espacement entre le contenu existant et la capture.
+            Margin = new Thickness(0, _zone.Document.Blocks.Count > 0 ? 12 : 0, 0, 4),
+        };
+        var lignes = texte.Replace("\r\n", "\n").TrimEnd('\n').Split('\n');
+        for (var i = 0; i < lignes.Length; i++)
+        {
+            if (i > 0)
+                bloc.Inlines.Add(new LineBreak());
+            bloc.Inlines.Add(new Run("> " + lignes[i]));
+        }
+        _zone.Document.Blocks.Add(bloc);
 
-        foreach (var ligne in texte.Replace("\r\n", "\n").TrimEnd('\n').Split('\n'))
-            sb.Append("> ").AppendLine(ligne);
-        sb.AppendLine(); // ligne vide où poser le caret pour la note
+        // Paragraphe vide en police normale : ce que je tape ensuite est en grand.
+        var note = new Paragraph
+        {
+            FontSize = TailleNote,
+            Foreground = Brushes.Gainsboro,
+            Margin = new Thickness(0),
+        };
+        _zone.Document.Blocks.Add(note);
 
-        _zone.Text = sb.ToString();
-        _zone.CaretIndex = _zone.Text.Length;
+        _zone.CaretPosition = note.ContentStart;
         _zone.ScrollToEnd();
     }
 
