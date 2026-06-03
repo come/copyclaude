@@ -8,6 +8,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Nécessaire pour que softprops/action-gh-release puisse créer la release.
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
