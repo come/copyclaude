@@ -78,10 +78,23 @@ internal static class Native
     public static extern IntPtr SetWindowLongPtr(IntPtr hwnd, int index, IntPtr newValue);
 
     /// <summary>
-    /// Active la fenêtre malgré WS_EX_NOACTIVATE — utilisé uniquement sur clic manuel
-    /// de l'utilisateur dans la fenêtre flottante, pour pouvoir y taper du texte.
+    /// Active la fenêtre malgré WS_EX_NOACTIVATE — utilisé sur clic manuel dans la
+    /// fenêtre flottante, ou à chaque capture si le toggle « Auto-focus » est actif.
     /// </summary>
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetForegroundWindow(IntPtr hwnd);
+
+    /// <summary>
+    /// Attache notre file d'input à celle d'un autre thread. Nécessaire pour que
+    /// SetForegroundWindow soit honoré depuis l'arrière-plan : Windows ne l'accorde
+    /// qu'au thread qui « possède » l'input courant.
+    /// </summary>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, [MarshalAs(UnmanagedType.Bool)] bool attach);
+
+    /// <summary>Id du thread appelant (pour AttachThreadInput).</summary>
+    [DllImport("kernel32.dll")]
+    public static extern uint GetCurrentThreadId();
 }

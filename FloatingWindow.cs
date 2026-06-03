@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -23,6 +24,7 @@ internal sealed class FloatingWindow : Window
     private static readonly Brush CouleurCapture = new SolidColorBrush(Color.FromRgb(0xA0, 0xA8, 0xB8));
 
     private readonly RichTextBox _zone;
+    private readonly ToggleButton _autoFocus;
 
     public FloatingWindow()
     {
@@ -54,6 +56,22 @@ internal sealed class FloatingWindow : Window
             FontSize = 12,
         };
 
+        // Toggle : si actif, chaque capture donne le focus à la fenêtre (assumé :
+        // c'est la seule exception, volontaire, à la règle « jamais voler le focus »).
+        _autoFocus = new ToggleButton
+        {
+            Content = "Auto-focus",
+            ToolTip = "Prendre le focus à chaque capture, prêt à taper la note",
+            Background = Brushes.Transparent,
+            Foreground = new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0xAA)),
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(8, 2, 8, 2),
+            FontSize = 11,
+            Cursor = Cursors.Hand,
+        };
+        _autoFocus.Checked += (_, _) => _autoFocus.Foreground = Brushes.White;
+        _autoFocus.Unchecked += (_, _) => _autoFocus.Foreground = new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0xAA));
+
         var boutonEffacer = CreerBoutonEntete("Effacer", "Vider le contenu de la fenêtre");
         boutonEffacer.Click += (_, _) => _zone!.Document.Blocks.Clear();
 
@@ -61,6 +79,7 @@ internal sealed class FloatingWindow : Window
         boutonQuitter.Click += (_, _) => Close();
 
         var boutons = new StackPanel { Orientation = Orientation.Horizontal };
+        boutons.Children.Add(_autoFocus);
         boutons.Children.Add(boutonEffacer);
         boutons.Children.Add(boutonQuitter);
 
@@ -178,6 +197,35 @@ internal sealed class FloatingWindow : Window
 
         _zone.CaretPosition = note.ContentStart;
         _zone.ScrollToEnd();
+
+        // Auto-focus actif → la fenêtre prend le focus, prête pour la note.
+        if (_autoFocus.IsChecked == true)
+            PrendreLeFocus();
+    }
+
+    /// <summary>
+    /// Donne le focus à la fenêtre depuis l'arrière-plan : Windows n'honore
+    /// SetForegroundWindow que pour le thread qui possède l'input, donc on
+    /// s'attache temporairement au thread de la fenêtre au premier plan.
+    /// </summary>
+    private void PrendreLeFocus()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        var threadPremierPlan = Native.GetWindowThreadProcessId(Native.GetForegroundWindow(), out _);
+        var notreThread = Native.GetCurrentThreadId();
+
+        var attache = threadPremierPlan != 0 && threadPremierPlan != notreThread
+            && Native.AttachThreadInput(threadPremierPlan, notreThread, true);
+        try
+        {
+            Native.SetForegroundWindow(hwnd);
+        }
+        finally
+        {
+            if (attache)
+                Native.AttachThreadInput(threadPremierPlan, notreThread, false);
+        }
+        _zone.Focus();
     }
 
     private static Button CreerBoutonEntete(string contenu, string infobulle) => new()

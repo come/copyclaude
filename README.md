@@ -36,6 +36,9 @@ In Windows Terminal's `settings.json` (Settings → *Open JSON file*), add:
   captured block, etc.). New captures are always appended **at the end** —
   nothing you typed is ever overwritten.
 - Drag the window by its header, resize it from the bottom-right corner.
+- `Auto-focus` (toggle): when enabled, each capture gives focus to the window,
+  caret ready to type the note — the one deliberate exception to the
+  no-focus-stealing rule.
 - `Effacer` clears the content; `✕` quits the app.
 
 ## Filtering captured applications
