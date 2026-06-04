@@ -1,0 +1,43 @@
+[package]
+name = "copyclaude"
+version = "0.1.0"
+edition = "2021"
+description = "Floating window capturing terminal selections (Linux/X11 port of CopyClaude)"
+license = "MIT"
+
+[[bin]]
+name = "copyclaude"
+path = "src/main.rs"
+
+[dependencies]
+# UI native GTK4.
+gtk4 = { version = "0.9", package = "gtk4" }
+# Récupération du XID X11 de la fenêtre GTK réalisée (pour poser les hints WM).
+gdk4-x11 = "0.9"
+# Accès X11 pur Rust : XFixes (sélection PRIMARY), propriétés EWMH, hints WM.
+x11rb = { version = "0.13", features = ["xfixes"] }
+# Marshaling thread X11 → boucle GTK.
+async-channel = "2"
+
+# --- Packaging .deb (cargo-deb) ---
+[package.metadata.deb]
+section = "utils"
+priority = "optional"
+depends = "libgtk-4-1, libx11-6, libxfixes3"
+assets = [
+    ["target/release/copyclaude", "usr/bin/", "755"],
+    ["packaging/copyclaude.desktop", "usr/share/applications/", "644"],
+    ["packaging/icon.png", "usr/share/icons/hicolor/256x256/apps/copyclaude.png", "644"],
+]
+
+# --- Packaging .rpm (cargo-generate-rpm) ---
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/copyclaude", dest = "/usr/bin/copyclaude", mode = "755" },
+    { source = "packaging/copyclaude.desktop", dest = "/usr/share/applications/copyclaude.desktop", mode = "644" },
+    { source = "packaging/icon.png", dest = "/usr/share/icons/hicolor/256x256/apps/copyclaude.png", mode = "644" },
+]
+[package.metadata.generate-rpm.requires]
+gtk4 = "*"
+libX11 = "*"
+libXfixes = "*"
