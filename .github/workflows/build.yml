@@ -49,3 +49,32 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: installer/*.exe
+
+  # Version Linux (Rust + GTK4, X11). Pour l'instant : vérification de compilation.
+  # Le packaging .deb/.rpm/AppImage arrivera en Phase 5 (cf. plan).
+  linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: linux
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer les libs de dev GTK4 / X11
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libx11-dev libxfixes-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            linux/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('linux/Cargo.toml', 'linux/Cargo.lock') }}
+
+      - name: Compiler
+        run: cargo build --release

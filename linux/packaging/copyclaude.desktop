@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=CopyClaude
+Comment=Floating window capturing terminal selections
+Exec=copyclaude
+Icon=copyclaude
+Terminal=false
+Categories=Utility;
