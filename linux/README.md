@@ -11,12 +11,18 @@ CLIPBOARD (Ctrl+V) reste intact.
 
 ## État
 
-- [x] **Phase 1** — coquille de la fenêtre flottante + hints X11
-      (always-on-top, no-focus-steal via `_NET_WM_STATE_ABOVE` + `WM_HINTS.input=false`).
-- [ ] Phase 2 — capture de la sélection PRIMARY (XFixes).
-- [ ] Phase 3 — multi-terminal (`_NET_ACTIVE_WINDOW`, buffers par fenêtre, onglets).
-- [ ] Phase 4 — finitions UI (Auto-focus, drag/resize, styles).
-- [ ] Phase 5 — packaging .deb / .rpm / AppImage + CI.
+Toutes les phases sont écrites et **la compilation + le packaging sont validés en
+CI** (job `linux` + `package-linux`). Le comportement à l'exécution reste à
+vérifier sur une vraie session **Xorg** (impossible en CI headless).
+
+- [x] **Phase 1** — fenêtre flottante + hints X11 (always-on-top, no-focus-steal
+      via `_NET_WM_STATE_ABOVE` + `WM_HINTS.input=false` + `_NET_WM_USER_TIME=0`).
+- [x] **Phase 2** — capture de la sélection PRIMARY via XFixes (thread dédié, debounce 300 ms).
+- [x] **Phase 3** — multi-terminal : suivi `_NET_ACTIVE_WINDOW`, un buffer par
+      fenêtre, barre d'onglets, sweep des terminaux fermés, titres vivants.
+- [x] **Phase 4** — Auto-focus (focus via `_NET_ACTIVE_WINDOW`), thème sombre CSS.
+- [x] **Phase 5** — packaging `.deb` / `.rpm` / `.tar.gz` + CI (attaché aux releases sur tag `v*`).
+- [ ] À faire : passe de test runtime sous Xorg ; AppImage (différé) ; support Wayland (wlroots).
 
 ## Build
 
@@ -32,13 +38,16 @@ cargo run
 
 > Doit tourner sous **X11** (session « Xorg »). Wayland est hors périmètre v1.
 
-## Packaging (à venir, Phase 5)
+## Packaging
 
 ```bash
 cargo install cargo-deb cargo-generate-rpm
-cargo deb            # → target/debian/copyclaude_*.deb
-cargo generate-rpm   # → target/generate-rpm/copyclaude-*.rpm
+convert "../icon.ico[0]" -resize 256x256 packaging/icon.png  # icône (ImageMagick)
+cargo build --release
+cargo deb --no-build   # → target/debian/copyclaude_*.deb
+cargo generate-rpm     # → target/generate-rpm/copyclaude-*.rpm
 ```
 
-Dépendances runtime déclarées : `libgtk-4-1`, `libx11-6`, `libxfixes3`.
-L'icône `packaging/icon.png` (256×256) reste à générer depuis `../icon.ico`.
+Dépendances runtime déclarées : `libgtk-4-1`, `libx11-6`, `libxfixes3`. La CI
+(`package-linux`) construit `.deb`/`.rpm`/`.tar.gz` à chaque push et les attache
+à la release GitHub sur tag `v*`. L'icône PNG est générée depuis `../icon.ico`.
