@@ -10,6 +10,8 @@ use x11rb::properties::WmHints;
 use x11rb::protocol::xproto::{
     AtomEnum, ClientMessageEvent, ConnectionExt, EventMask, PropMode, Window,
 };
+// Fournit les helpers `change_property8/16/32` (trait distinct de xproto::ConnectionExt).
+use x11rb::wrapper::ConnectionExt as _;
 
 /// Action `_NET_WM_STATE` : 0 = retirer, 1 = ajouter (cf. spec EWMH).
 const NET_WM_STATE_REMOVE: u32 = 0;
@@ -30,7 +32,7 @@ pub fn apply_floating_hints(xid: u32) -> Result<(), Box<dyn std::error::Error>> 
     hints.set(&conn, window)?;
 
     let user_time = conn.intern_atom(false, b"_NET_WM_USER_TIME")?.reply()?.atom;
-    conn.change_property32(PropMode::Replace, window, user_time, AtomEnum::CARDINAL, &[0])?;
+    conn.change_property32(PropMode::REPLACE, window, user_time, AtomEnum::CARDINAL, &[0])?;
 
     // 2) Type « utility » : pas dans l'alt-tab, traité comme un utilitaire flottant.
     let wm_type = conn.intern_atom(false, b"_NET_WM_WINDOW_TYPE")?.reply()?.atom;
@@ -38,7 +40,7 @@ pub fn apply_floating_hints(xid: u32) -> Result<(), Box<dyn std::error::Error>> 
         .intern_atom(false, b"_NET_WM_WINDOW_TYPE_UTILITY")?
         .reply()?
         .atom;
-    conn.change_property32(PropMode::Replace, window, wm_type, AtomEnum::ATOM, &[wm_type_utility])?;
+    conn.change_property32(PropMode::REPLACE, window, wm_type, AtomEnum::ATOM, &[wm_type_utility])?;
 
     conn.flush()?;
     Ok(())
