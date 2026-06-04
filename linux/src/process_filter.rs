@@ -15,6 +15,7 @@ const DEFAULT_ALLOWLIST: &[&str] = &[
     "xterm",
     "alacritty",
     "kitty",
+    "ghostty",
     "wezterm",
     "wezterm-gui",
     "foot",
