@@ -1,10 +1,12 @@
 //! Couche X11 (x11rb).
-//! - `props`    : pose des hints WM sur la fenêtre flottante (always-on-top,
-//!                no-focus-steal).
-//! - `selection`: surveillance de la sélection PRIMARY via XFixes (la capture).
-//!
-//! Le suivi de la fenêtre active (`_NET_ACTIVE_WINDOW`) pour le multi-terminal
-//! arrivera en Phase 3.
+//! - `atoms`   : atomes internés, partagés.
+//! - `query`   : lectures sans état (fenêtre active, PID, titre, existence).
+//! - `props`   : pose des hints WM (always-on-top, no-focus-steal) + activation.
+//! - `reader`  : connexion de lecture pour le thread GTK (titres, sweep).
+//! - `watcher` : thread X11 (sélection PRIMARY via XFixes + suivi fenêtre active).
 
+pub mod atoms;
 pub mod props;
-pub mod selection;
+pub mod query;
+pub mod reader;
+pub mod watcher;

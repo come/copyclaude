@@ -12,6 +12,7 @@ use x11rb::protocol::xproto::{
 };
 // Fournit les helpers `change_property8/16/32` (trait distinct de xproto::ConnectionExt).
 use x11rb::wrapper::ConnectionExt as _;
+use x11rb::CURRENT_TIME;
 
 /// Action `_NET_WM_STATE` : 0 = retirer, 1 = ajouter (cf. spec EWMH).
 const NET_WM_STATE_REMOVE: u32 = 0;
@@ -60,6 +61,27 @@ pub fn set_above(xid: u32, above: bool) -> Result<(), Box<dyn std::error::Error>
     // adressé à la root (mode requis par la spec EWMH).
     let action = if above { NET_WM_STATE_ADD } else { NET_WM_STATE_REMOVE };
     let event = ClientMessageEvent::new(32, window, wm_state, [action, wm_state_above, 0, 1, 0]);
+    conn.send_event(
+        false,
+        root,
+        EventMask::SUBSTRUCTURE_NOTIFY | EventMask::SUBSTRUCTURE_REDIRECT,
+        event,
+    )?;
+    conn.flush()?;
+    Ok(())
+}
+
+/// Donne le focus à notre fenêtre (message client `_NET_ACTIVE_WINDOW`). Utilisé
+/// uniquement sur action explicite (clic, ou toggle Auto-focus) — jamais sur un
+/// ajout automatique. Pas besoin de l'`AttachThreadInput` de Windows : X11 honore
+/// la requête d'activation directement.
+pub fn activate(xid: u32) -> Result<(), Box<dyn std::error::Error>> {
+    let (conn, screen_num) = x11rb::connect(None)?;
+    let root = conn.setup().roots[screen_num].root;
+    let net_active = conn.intern_atom(false, b"_NET_ACTIVE_WINDOW")?.reply()?.atom;
+
+    // data[0] = 1 : indication « demande applicative » (cf. spec EWMH).
+    let event = ClientMessageEvent::new(32, xid, net_active, [1, CURRENT_TIME, 0, 0, 0]);
     conn.send_event(
         false,
         root,

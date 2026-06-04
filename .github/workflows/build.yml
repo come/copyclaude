@@ -78,3 +78,80 @@ jobs:
 
       - name: Compiler
         run: cargo build --release
+
+  # Packaging Linux : .deb / .rpm / .tar.gz. Exécuté à chaque push/PR pour valider
+  # la chaîne ; attaché à la release GitHub uniquement sur tag v*.
+  package-linux:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: linux
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer les dépendances de build et de packaging
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libx11-dev libxfixes-dev imagemagick
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo (registry + outils)
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            linux/target
+          key: ${{ runner.os }}-cargo-pkg-${{ hashFiles('linux/Cargo.toml', 'linux/Cargo.lock') }}
+
+      - name: Installer cargo-deb / cargo-generate-rpm
+        run: |
+          cargo install cargo-deb --locked || true
+          cargo install cargo-generate-rpm --locked || true
+
+      # Version depuis le tag (v1.2.3 → 1.2.3), sinon 0.0.0.
+      - name: Déterminer la version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then VER="${GITHUB_REF#refs/tags/v}"; else VER="0.0.0"; fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          sed -i "s/^version = \"0.1.0\"/version = \"$VER\"/" Cargo.toml
+
+      - name: Générer l'icône PNG depuis icon.ico
+        run: convert "../icon.ico[0]" -resize 256x256 packaging/icon.png
+
+      - name: Compiler (release)
+        run: cargo build --release
+
+      - name: Construire le .deb
+        run: cargo deb --no-build
+
+      - name: Construire le .rpm
+        run: cargo generate-rpm
+
+      - name: Construire le .tar.gz
+        run: |
+          mkdir -p "dist/copyclaude"
+          cp target/release/copyclaude "dist/copyclaude/"
+          cp packaging/copyclaude.desktop packaging/icon.png "dist/copyclaude/"
+          tar -czf "copyclaude-${{ steps.version.outputs.version }}-linux-x64.tar.gz" -C dist copyclaude
+
+      - name: Publier les artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: copyclaude-linux-${{ steps.version.outputs.version }}
+          path: |
+            linux/target/debian/*.deb
+            linux/target/generate-rpm/*.rpm
+            linux/copyclaude-*-linux-x64.tar.gz
+
+      - name: Release GitHub
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            linux/target/debian/*.deb
+            linux/target/generate-rpm/*.rpm
+            linux/copyclaude-*-linux-x64.tar.gz
