@@ -125,6 +125,11 @@ jobs:
       - name: Compiler (release)
         run: cargo build --release
 
+      # Le cache conserve linux/target ; on purge les sorties de packaging pour
+      # qu'aucun paquet d'un run précédent (autre version) ne soit ramassé par les globs.
+      - name: Purger les sorties de packaging
+        run: rm -rf target/debian target/generate-rpm
+
       - name: Construire le .deb
         run: cargo deb --no-build
 
