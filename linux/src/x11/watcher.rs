@@ -1,9 +1,10 @@
 //! Thread de surveillance X11 (connexion + boucle d'events dédiées) — l'équivalent
 //! Linux de `ClipboardListener` + `ForegroundWatcher` réunis :
-//! - **sélection PRIMARY** via XFixes (le copy-on-select natif de X11) ;
+//! - **sélections PRIMARY et CLIPBOARD** via XFixes (copy-on-select natif X11 +
+//!   Ctrl+C / OSC 52 / copie des TUI comme tmux ou Claude Code) ;
 //! - **fenêtre active** via `PropertyNotify` sur `_NET_ACTIVE_WINDOW`.
 //!
-//! On lit PRIMARY, jamais le CLIPBOARD : Ctrl+V ailleurs reste intact.
+//! On *lit* ces sélections, on ne les *écrit* jamais : Ctrl+V ailleurs reste intact.
 //! Les events sont envoyés au thread GTK via un `async-channel`.
 
 use std::time::{Duration, Instant};
@@ -62,15 +63,14 @@ pub fn run(sender: async_channel::Sender<X11Event>) -> Result<(), Box<dyn std::e
 
     let atoms = Atoms::intern(&conn)?;
     let primary: Atom = AtomEnum::PRIMARY.into();
+    let clipboard = atoms.clipboard;
 
-    // S'abonner aux changements de propriétaire de PRIMARY…
-    conn.xfixes_select_selection_input(
-        win,
-        primary,
-        SelectionEventMask::SET_SELECTION_OWNER
-            | SelectionEventMask::SELECTION_WINDOW_DESTROY
-            | SelectionEventMask::SELECTION_CLIENT_CLOSE,
-    )?;
+    // S'abonner aux changements de propriétaire de PRIMARY et CLIPBOARD…
+    let sel_mask = SelectionEventMask::SET_SELECTION_OWNER
+        | SelectionEventMask::SELECTION_WINDOW_DESTROY
+        | SelectionEventMask::SELECTION_CLIENT_CLOSE;
+    conn.xfixes_select_selection_input(win, primary, sel_mask)?;
+    conn.xfixes_select_selection_input(win, clipboard, sel_mask)?;
     // …et aux changements de propriétés de la root (pour `_NET_ACTIVE_WINDOW`).
     conn.change_window_attributes(
         root,
@@ -79,15 +79,18 @@ pub fn run(sender: async_channel::Sender<X11Event>) -> Result<(), Box<dyn std::e
     conn.flush()?;
 
     let mut deadline: Option<Instant> = None;
-    let mut source: Option<Window> = None;
+    // Sélection en attente de lecture : fenêtre source + atome (PRIMARY|CLIPBOARD).
+    let mut pending: Option<(Window, Atom)> = None;
+    // Dernier texte émis, pour ne pas capturer deux fois (PRIMARY+CLIPBOARD posés ensemble).
+    let mut last_text: Option<String> = None;
 
     loop {
         while let Some(event) = conn.poll_for_event()? {
             match event {
-                // Nouvelle sélection PRIMARY posée par une autre fenêtre que nous.
+                // Nouvelle sélection (PRIMARY ou CLIPBOARD) posée par une autre fenêtre.
                 Event::XfixesSelectionNotify(ev)
                     if ev.subtype == SelectionEvent::SET_SELECTION_OWNER
-                        && ev.selection == primary
+                        && (ev.selection == primary || ev.selection == clipboard)
                         && ev.owner != win
                         && ev.owner != x11rb::NONE =>
                 {
@@ -96,7 +99,7 @@ pub fn run(sender: async_channel::Sender<X11Event>) -> Result<(), Box<dyn std::e
                     if let Some(active) = query::active_window(&conn, &atoms, root) {
                         if let Some(pid) = query::window_pid(&conn, &atoms, active) {
                             if filter.is_terminal(pid) {
-                                source = Some(active);
+                                pending = Some((active, ev.selection));
                                 deadline = Some(Instant::now() + DEBOUNCE);
                             }
                         }
@@ -123,9 +126,10 @@ pub fn run(sender: async_channel::Sender<X11Event>) -> Result<(), Box<dyn std::e
         if let Some(at) = deadline {
             if Instant::now() >= at {
                 deadline = None;
-                if let Some(src) = source.take() {
-                    if let Some(text) = read_primary(&conn, win, primary, &atoms)? {
-                        if !text.is_empty() {
+                if let Some((src, selection)) = pending.take() {
+                    if let Some(text) = read_selection(&conn, win, selection, &atoms)? {
+                        if !text.is_empty() && last_text.as_deref() != Some(text.as_str()) {
+                            last_text = Some(text.clone());
                             let _ = sender.send_blocking(X11Event::Capture { text, xid: src });
                         }
                     }
@@ -137,14 +141,14 @@ pub fn run(sender: async_channel::Sender<X11Event>) -> Result<(), Box<dyn std::e
     }
 }
 
-/// Demande le contenu de PRIMARY en UTF-8 et attend le `SelectionNotify`.
-fn read_primary(
+/// Demande le contenu d'une sélection en UTF-8 et attend le `SelectionNotify`.
+fn read_selection(
     conn: &impl Connection,
     win: Window,
-    primary: Atom,
+    selection: Atom,
     atoms: &Atoms,
 ) -> Result<Option<String>, Box<dyn std::error::Error>> {
-    conn.convert_selection(win, primary, atoms.utf8_string, atoms.transfer, CURRENT_TIME)?;
+    conn.convert_selection(win, selection, atoms.utf8_string, atoms.transfer, CURRENT_TIME)?;
     conn.flush()?;
 
     let deadline = Instant::now() + Duration::from_millis(1000);
