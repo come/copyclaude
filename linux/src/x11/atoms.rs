@@ -9,7 +9,9 @@ pub struct Atoms {
     pub net_wm_pid: Atom,
     pub net_wm_name: Atom,
     pub utf8_string: Atom,
-    /// Propriété temporaire où le serveur dépose le contenu de PRIMARY.
+    /// Sélection CLIPBOARD (Ctrl+C, OSC 52, TUI). Lue, jamais écrite.
+    pub clipboard: Atom,
+    /// Propriété temporaire où le serveur dépose le contenu d'une sélection.
     pub transfer: Atom,
 }
 
@@ -20,6 +22,7 @@ impl Atoms {
             net_wm_pid: intern(conn, b"_NET_WM_PID")?,
             net_wm_name: intern(conn, b"_NET_WM_NAME")?,
             utf8_string: intern(conn, b"UTF8_STRING")?,
+            clipboard: intern(conn, b"CLIPBOARD")?,
             transfer: intern(conn, b"COPYCLAUDE_SELECTION")?,
         })
     }

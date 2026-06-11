@@ -52,7 +52,6 @@ struct TermBuffer {
 
 /// État partagé de l'UI (sur le thread GTK uniquement → `Rc`, pas de `Send`).
 struct AppState {
-    window: ApplicationWindow,
     text_view: TextView,
     tab_bar: GtkBox,
     tab_bar_host: ScrolledWindow,
@@ -154,7 +153,6 @@ fn build_ui(app: &Application) {
     window.set_child(Some(&root));
 
     let state = Rc::new(AppState {
-        window: window.clone(),
         text_view: text_view.clone(),
         tab_bar,
         tab_bar_host,

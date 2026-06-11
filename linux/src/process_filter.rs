@@ -39,10 +39,7 @@ impl ProcessFilter {
 
     /// Vrai si le PID correspond à un process de l'allowlist.
     pub fn is_terminal(&self, pid: u32) -> bool {
-        match process_comm(pid) {
-            Some(name) => self.allowlist.contains(&name),
-            None => false,
-        }
+        process_names(pid).iter().any(|n| self.allowlist.contains(n))
     }
 
     /// Vrai si le PID est notre propre process (la fenêtre flottante).
@@ -51,10 +48,21 @@ impl ProcessFilter {
     }
 }
 
-/// Lit `/proc/<pid>/comm` (nom du process, sans chemin ni arguments).
-fn process_comm(pid: u32) -> Option<String> {
-    let raw = fs::read_to_string(format!("/proc/{pid}/comm")).ok()?;
-    Some(raw.trim_end().to_string())
+/// Noms candidats d'un process, testés contre l'allowlist :
+/// - `/proc/<pid>/comm` : nom court, tronqué à 15 caractères (ex. `gnome-terminal-`) ;
+/// - basename de `/proc/<pid>/exe` : binaire réel résolu, insensible aux wrappers
+///   de lancement (ex. ghostty démarré via `x-terminal-emulator` → `ghostty`).
+fn process_names(pid: u32) -> Vec<String> {
+    let mut names = Vec::new();
+    if let Ok(comm) = fs::read_to_string(format!("/proc/{pid}/comm")) {
+        names.push(comm.trim_end().to_string());
+    }
+    if let Ok(exe) = fs::read_link(format!("/proc/{pid}/exe")) {
+        if let Some(base) = exe.file_name().and_then(|s| s.to_str()) {
+            names.push(base.to_string());
+        }
+    }
+    names
 }
 
 fn load_allowlist() -> HashSet<String> {

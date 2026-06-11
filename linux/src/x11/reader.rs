@@ -2,7 +2,6 @@
 //! d'onglet, existence d'un terminal lors du sweep). Distincte de la connexion
 //! du watcher : pas de partage entre threads.
 
-use x11rb::connection::Connection;
 use x11rb::rust_connection::RustConnection;
 
 use crate::x11::atoms::Atoms;
